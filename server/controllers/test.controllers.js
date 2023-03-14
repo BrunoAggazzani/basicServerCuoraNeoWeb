@@ -51,7 +51,7 @@ export const sqlServerConnect = async (req, res) => {
     let resultado = null;
     try {
         await sql.connect(sqlConfig);
-        sql.query('select 1 as number').then((result) => {
+        sql.query(`select ${1} as number`).then((result) => {
             resultado = JSON.stringify(result.recordset[0].number);
             console.log('Resultado: '+resultado);
             res.setHeader('Content-Type', 'application/json');
@@ -59,7 +59,7 @@ export const sqlServerConnect = async (req, res) => {
             sql.close();
         });      
     } catch (err) {
-        //console.log(err);
+        console.log(err);
         console.log('Resultado: '+JSON.stringify(resultado));
         res.send(JSON.stringify(resultado));
         sql.close();
@@ -83,8 +83,9 @@ export const updaterSQLserver = async (req, res) => {
   let DBext_type = '';
   let DBext_query = '';  
 
-  if (req != undefined && req != null) { // Los datos para la conexion remota son traidos desde el formulario web.
+  if (req != undefined && req != null && req != '') { // Los datos para la conexion remota son traidos desde el formulario web.
     let data = req.body;
+    console.log('1 - Datos traidos desde el form web: '+JSON.stringify(data));
     DBext_host = data.dbExt.host;
     //DBext_port = data.dbExt.port;
     DBext_dbName = data.dbExt.dbName;
@@ -95,7 +96,7 @@ export const updaterSQLserver = async (req, res) => {
   } else {  // Los datos para la conexion remota son traidos desde la BBDD local. 
     try {
       req = await pool.query(`SELECT db_ip, db_nombre, db_usuario, db_clave, db_tipo, query FROM configuracion`);
-      console.log('Trayendo datos de configuracion remota desde la base local...');
+      console.log('2 - Trayendo datos de configuracion remota desde la base local...');
       DBext_host = req.rows[0].db_ip;
       DBext_dbName = req.rows[0].db_nombre;
       DBext_user = req.rows[0].db_usuario; 
@@ -103,7 +104,7 @@ export const updaterSQLserver = async (req, res) => {
       DBext_type = req.rows[0].db_tipo;
       DBext_query = req.rows[0].query;
     } catch (e){
-      //console.log(e);
+      console.log('Error trayendo datos: '+e);
       console.log('No se pudieron tarer los datos de configuracion remota desde la base local');
     }
   }
@@ -126,22 +127,25 @@ export const updaterSQLserver = async (req, res) => {
 
   let resultado = null;
 
-  try {
+  const querySQLSERVER = async(sqlConfig) => {
+    try {
       await sql.connect(sqlConfig).then(async (pool) => {
           await pool.query(DBext_query).then((result) => {
             resultado = result.recordsets[0];
           });
       });              
-  } catch (err) {
-      //console.log(err);
+    } catch (err) {
+      console.log('Error consulta BBDD SQL SERVER: '+err);
       console.log('Fallo la consulta a BBDD MS SQL SERVER');
+    }
   }
+ 
 
   const datosBDlocal = () => {
     let QODBC3 = false;
     try {
       req = pool.query(`SELECT db_tipo FROM configuracion`);
-      //console.log('db_tipo es: '+req.rows[0].db_tipo);
+      console.log('db_tipo es: '+req.rows[0].db_tipo);
       if (req.rows[0].db_tipo == 'QODBC3') {
         QODBC3 = true;
       } else {
@@ -154,6 +158,8 @@ export const updaterSQLserver = async (req, res) => {
     return QODBC3;
   };
 
+
+
   if (updating == true) {
     console.log('Deteniendo intervalo...');
     clearInterval(interval);
@@ -165,28 +171,32 @@ export const updaterSQLserver = async (req, res) => {
 
   interval = setInterval(() => {
     updating = true;
-    if (datosBDlocal) {
+    if (datosBDlocal) { // Esto pregunta si la BBDD es SQLSERVER.
       console.log('El tipo de BBDD es: QODBC3');
-      if (resultado != null){
-        for (let i = 0; i < resultado.length; i++) {
-          //console.log(JSON.stringify(Object.values(resultado[i])));
-          let barcode = Object.values(resultado[i])[0];
-          let nombre = Object.values(resultado[i])[1];
-          let precio = Object.values(resultado[i])[2];
-          try {
-            req = pool.query(`select create_product_vicl(character varying '${barcode}',character varying '${nombre}', ${precio})`);
-            //console.log('Producto '+(i+1)+' actualizado en BBDD local');
-          } catch (e){
-            //console.log(e);
-            console.log('No se pudieron cargar los productos en la BBDD local');
-          } 
+      querySQLSERVER(sqlConfig);
+      setTimeout(() => {
+        if (resultado != null){
+          for (let i = 0; i < resultado.length; i++) {
+            console.log('La consulta SQLSERVER esta compuesta por: '+JSON.stringify(Object.values(resultado[i])));
+            let barcode = Object.values(resultado[i])[0];
+            let nombre = Object.values(resultado[i])[1];
+            let precio = Object.values(resultado[i])[2];
+            try {
+              req = pool.query(`select create_product_vicl(character varying '${barcode}',character varying '${nombre}', ${precio})`);
+              console.log('Producto '+(i+1)+' actualizado en BBDD local');
+            } catch (e){
+              //console.log(e);
+              console.log('No se pudieron cargar los productos en la BBDD local');
+            } 
+          }
+          console.log('Productos actualizados exitosamente!');
+          currentTime = moment().format('hh:mm:ss');
+          console.log(currentTime);
+        } else {
+          console.log('Productos NO actualizados: "resultado" es null');
         }
-        console.log('Productos actualizados exitosamente!');
-        currentTime = moment().format('hh:mm:ss');
-        console.log(currentTime);
-      } else {
-        console.log('Productos NO actualizados: "resultado" es null');
-      }  
+      }, 5000);
+            
     } else {
       console.log('El tipo de BBDD NO es QODBC3');
     }            
@@ -212,5 +222,20 @@ export const setSyncTime = async(req, res) => {
   } catch (e){
       console.log(e);
       console.log('No se pudo actualizar update_time');
+  }
+}
+
+export const getLastUpdated = async(req, res) => {
+  let last_update;
+  try {
+      req = await pool.query(`SELECT max(to_char(updated, 'YYYY/MM/dd HH:mi:ss')) FROM public.product`);      
+      last_update = req.rows[0].max;
+      last_update = last_update.replace('"', '');
+      console.log('last_updated: '+last_update); 
+      res.setHeader('Content-Type', 'application/json');
+      res.json(last_update);
+  } catch (e){
+      console.log(e);
+      console.log('No se pudo traer last_updated');
   }
 }
