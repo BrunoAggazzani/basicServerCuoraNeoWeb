@@ -3,7 +3,7 @@ import * as test from "../controllers/test.controllers";
 
 const configDB = {
     user: 'systel',
-    host: '192.168.2.180',
+    host: 'localhost',
     port: '5432',
     password: 'Systel#4316',
     database: 'cuora',
