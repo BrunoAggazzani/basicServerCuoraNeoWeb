@@ -141,7 +141,7 @@ export const updaterSQLserver = async (req, res) => {
   }
  
 
-  const datosBDlocal = () => {
+  const isQODBC3 = () => {
     let QODBC3 = false;
     try {
       req = pool.query(`SELECT db_tipo FROM configuracion`);
@@ -153,11 +153,28 @@ export const updaterSQLserver = async (req, res) => {
       }
     } catch (e){
       //console.log(e);
-      console.log('Fallo la funcion "datosBDlocal"');
+      console.log('Fallo la funcion "isQODBC3"');
     }
     return QODBC3;
   };
 
+  
+  const useDBext = () => {
+    let DBext = false;
+    try {
+      req = pool.query(`SELECT usar_base_externa FROM configuracion`);
+      console.log('usar_base_externa es: '+req.rows[0].usar_base_externa);
+      if (req.rows[0].usar_base_externa) {
+        DBext = true;
+      } else {
+        DBext = false;
+      }
+    } catch (e){
+      //console.log(e);
+      console.log('Fallo la funcion "useDBext"');
+    }
+    return DBext;
+  };
 
 
   if (updating == true) {
@@ -171,34 +188,38 @@ export const updaterSQLserver = async (req, res) => {
 
   interval = setInterval(() => {
     updating = true;
-    if (datosBDlocal) { // Esto pregunta si la BBDD es SQLSERVER.
-      console.log('El tipo de BBDD es: QODBC3');
-      querySQLSERVER(sqlConfig);
-      setTimeout(() => {
-        if (resultado != null){
-          for (let i = 0; i < resultado.length; i++) {
-            console.log('La consulta SQLSERVER esta compuesta por: '+JSON.stringify(Object.values(resultado[i])));
-            let barcode = Object.values(resultado[i])[0];
-            let nombre = Object.values(resultado[i])[1];
-            let precio = Object.values(resultado[i])[2];
-            try {
-              req = pool.query(`select create_product_vicl(character varying '${barcode}',character varying '${nombre}', ${precio})`);
-              console.log('Producto '+(i+1)+' actualizado en BBDD local');
-            } catch (e){
-              //console.log(e);
-              console.log('No se pudieron cargar los productos en la BBDD local');
-            } 
+    if (useDBext) { // Esto pregunta si usa BBDD externa.
+      if (isQODBC3) { // Esto pregunta si la BBDD es SQLSERVER.
+        console.log('El tipo de BBDD es: QODBC3');
+        querySQLSERVER(sqlConfig);
+        setTimeout(() => {
+          if (resultado != null){
+            for (let i = 0; i < resultado.length; i++) {
+              console.log('La consulta SQLSERVER esta compuesta por: '+JSON.stringify(Object.values(resultado[i])));
+              let barcode = Object.values(resultado[i])[0];
+              let nombre = Object.values(resultado[i])[1];
+              let precio = Object.values(resultado[i])[2];
+              try {
+                req = pool.query(`select create_product_vicl(character varying '${barcode}',character varying '${nombre}', ${precio})`);
+                console.log('Producto '+(i+1)+' actualizado en BBDD local');
+              } catch (e){
+                //console.log(e);
+                console.log('No se pudieron cargar los productos en la BBDD local');
+              } 
+            }
+            console.log('Productos actualizados exitosamente!');
+            currentTime = moment().format('hh:mm:ss');
+            console.log(currentTime);
+          } else {
+            console.log('Productos NO actualizados: "resultado" es null');
           }
-          console.log('Productos actualizados exitosamente!');
-          currentTime = moment().format('hh:mm:ss');
-          console.log(currentTime);
-        } else {
-          console.log('Productos NO actualizados: "resultado" es null');
-        }
-      }, 5000);
-            
+        }, 5000);
+
+      } else {
+        console.log('El tipo de BBDD NO es QODBC3');
+      }
     } else {
-      console.log('El tipo de BBDD NO es QODBC3');
+      console.log('No usa BBDD externa');
     }            
   }, time * 60000);   
     
