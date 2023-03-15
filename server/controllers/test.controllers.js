@@ -228,7 +228,7 @@ export const setSyncTime = async(req, res) => {
 export const getLastUpdated = async(req, res) => {
   let last_update;
   try {
-      req = await pool.query(`SELECT max(to_char(updated, 'YYYY/MM/dd HH:mi:ss')) FROM public.product`);      
+      req = await pool.query(`SELECT to_char(updated, 'YYYY/MM/DD HH24:MI:SS') from product order by updated desc limit 1`);      
       last_update = req.rows[0].max;
       last_update = last_update.replace('"', '');
       console.log('last_updated: '+last_update); 
