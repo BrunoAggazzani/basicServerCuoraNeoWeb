@@ -127,7 +127,7 @@ export const updaterSQLserver = async (req, res) => {
 
   let resultado = null;
 
-  const querySQLSERVER = async(sqlConfig) => {
+  const querySQLSERVER = async(sqlConfig) => { // trae los productos de la BBDD SQL SERVER y lo almacena en la variable resultado.
     try {
       await sql.connect(sqlConfig).then(async (pool) => {
           await pool.query(DBext_query).then((result) => {
@@ -141,37 +141,37 @@ export const updaterSQLserver = async (req, res) => {
   }
  
 
-  const isQODBC3 = () => {
+  const isQODBC3 = async() => {
     let QODBC3 = false;
     try {
-      req = pool.query(`SELECT db_tipo FROM configuracion`);
+      req = await pool.query(`SELECT db_tipo FROM configuracion`);
       console.log('db_tipo es: '+req.rows[0].db_tipo);
       if (req.rows[0].db_tipo == 'QODBC3') {
         QODBC3 = true;
       } else {
         QODBC3 = false;
       }
-    } catch (e){
-      //console.log(e);
+    } catch (e){      
       console.log('Fallo la funcion "isQODBC3"');
+      console.log(e);
     }
     return QODBC3;
   };
 
   
-  const useDBext = () => {
+  const useDBext = async() => {
     let DBext = false;
     try {
-      req = pool.query(`SELECT usar_base_externa FROM configuracion`);
+      req = await pool.query(`SELECT usar_base_externa FROM configuracion`);
       console.log('usar_base_externa es: '+req.rows[0].usar_base_externa);
       if (req.rows[0].usar_base_externa) {
         DBext = true;
       } else {
         DBext = false;
       }
-    } catch (e){
-      //console.log(e);
+    } catch (e){      
       console.log('Fallo la funcion "useDBext"');
+      console.log(e);
     }
     return DBext;
   };
@@ -186,32 +186,33 @@ export const updaterSQLserver = async (req, res) => {
   let time = await syncTime(req);
   console.log('time is: '+time);
 
-  interval = setInterval(() => {
+  interval = setInterval(async() => {
     updating = true;
-    if (useDBext) { // Esto pregunta si usa BBDD externa.
-      if (isQODBC3) { // Esto pregunta si la BBDD es SQLSERVER.
+    if (await useDBext() == true) { // Esto pregunta si usa BBDD externa.
+      console.log('SI usa BBDD externa');
+      if (await isQODBC3() == true) { // Esto pregunta si la BBDD es SQLSERVER.
         console.log('El tipo de BBDD es: QODBC3');
         querySQLSERVER(sqlConfig);
         setTimeout(() => {
           if (resultado != null){
             for (let i = 0; i < resultado.length; i++) {
-              console.log('La consulta SQLSERVER esta compuesta por: '+JSON.stringify(Object.values(resultado[i])));
+              //console.log('La consulta SQLSERVER esta compuesta por: '+JSON.stringify(Object.values(resultado[i])));
               let barcode = Object.values(resultado[i])[0];
               let nombre = Object.values(resultado[i])[1];
               let precio = Object.values(resultado[i])[2];
               try {
                 req = pool.query(`select create_product_vicl(character varying '${barcode}',character varying '${nombre}', ${precio})`);
-                console.log('Producto '+(i+1)+' actualizado en BBDD local');
+                //console.log('Producto '+(i+1)+' actualizado en BBDD local');
               } catch (e){
-                //console.log(e);
-                console.log('No se pudieron cargar los productos en la BBDD local');
+                console.log(e);
+                //console.log('No se pudieron cargar los productos en la BBDD local');
               } 
             }
             console.log('Productos actualizados exitosamente!');
             currentTime = moment().format('hh:mm:ss');
             console.log(currentTime);
           } else {
-            console.log('Productos NO actualizados: "resultado" es null');
+            console.log('Productos NO actualizados: No se obtuvieron productos de BBDD SQL SERVER');
           }
         }, 5000);
 
@@ -219,7 +220,7 @@ export const updaterSQLserver = async (req, res) => {
         console.log('El tipo de BBDD NO es QODBC3');
       }
     } else {
-      console.log('No usa BBDD externa');
+      console.log('NO usa BBDD externa');
     }            
   }, time * 60000);   
     
@@ -250,8 +251,9 @@ export const getLastUpdated = async(req, res) => {
   let last_update;
   try {
       req = await pool.query(`SELECT to_char(updated, 'YYYY/MM/DD HH24:MI:SS') from product order by updated desc limit 1`);      
-      last_update = req.rows[0].max;
-      last_update = last_update.replace('"', '');
+      last_update = req.rows[0].to_char;
+      console.log(req.rows[0].to_char);
+      //last_update = last_update.replace('"', '');
       console.log('last_updated: '+last_update); 
       res.setHeader('Content-Type', 'application/json');
       res.json(last_update);
