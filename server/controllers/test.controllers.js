@@ -2,6 +2,7 @@
 const moment = require('moment')
 const sql = require('mssql')
 import { pool } from '../DB/connect';
+const { execFile } = require('child_process');
 
 
 let currentTime = moment().format('hh:mm:ss');
@@ -261,4 +262,26 @@ export const getLastUpdated = async(req, res) => {
       console.log(e);
       console.log('No se pudo traer last_updated');
   }
+}
+
+export const dateTimeUpdater = (req, res) => {
+  let dateTime = JSON.stringify(req.body.date);
+  console.log('dateTime: '+dateTime);
+  
+  let arg =['@'+dateTime];
+  execFile('./dateTimeUpdater.sh', arg, (error, stdout, stderr) => {                  
+    if (error) {
+      console.log(`error: ${error.message}`);
+    } else if (stderr) {
+      console.error(`stderr: ${stderr}`);
+    } else {
+      console.log(`stdout: ${stdout}`);
+      res
+        .header('Access-Control-Allow-Origin', '*')
+        .set("Content-Security-Policy", "script-src 'self' 'unsafe-inline' 'unsafe-eval'")
+        .status(200);
+    }                      
+  });
+  
+
 }

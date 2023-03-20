@@ -15,7 +15,7 @@ pool
     .connect()
     .then(() => {
         console.log('DB connectedx!!!');
-        test.updaterSQLserver();
+        //test.updaterSQLserver();
     })
     //.then(() => test.updaterSQLserver)
     .catch((err) => console.error('DB Connected error!!!'))

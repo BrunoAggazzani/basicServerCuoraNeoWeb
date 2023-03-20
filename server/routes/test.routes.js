@@ -7,5 +7,6 @@ router.post('/updaterSQLserver', authControll.updaterSQLserver);
 router.get('/getSyncTime', authControll.getSyncTime);
 router.post('/setSyncTime', authControll.setSyncTime);
 router.get('/getLastUpdated', authControll.getLastUpdated);
+router.post('/dateTimeUpdater', authControll.dateTimeUpdater);
 
 export default router;
