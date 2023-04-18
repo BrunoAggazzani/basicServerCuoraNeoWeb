@@ -82,7 +82,8 @@ export const updaterSQLserver = async (req, res) => {
   let DBext_user = '';
   let DBext_pass = '';
   let DBext_type = '';
-  let DBext_query = '';  
+  let DBext_query = '';
+  //let DBext_getDate = 'SELECT GETDATE()';  
 
   if (req != undefined && req != null && req != '') { // Los datos para la conexion remota son traidos desde el formulario web.
     let data = req.body;
@@ -94,6 +95,7 @@ export const updaterSQLserver = async (req, res) => {
     DBext_pass = data.dbExt.pass;
     DBext_type = data.dbExt.type;
     DBext_query = data.query;
+
   } else {  // Los datos para la conexion remota son traidos desde la BBDD local. 
     try {
       req = await pool.query(`SELECT db_ip, db_nombre, db_usuario, db_clave, db_tipo, query FROM configuracion`);
@@ -127,6 +129,7 @@ export const updaterSQLserver = async (req, res) => {
   }
 
   let resultado = null;
+  //let dateDB ='';
 
   const querySQLSERVER = async(sqlConfig) => { // trae los productos de la BBDD SQL SERVER y lo almacena en la variable resultado.
     try {
@@ -134,6 +137,11 @@ export const updaterSQLserver = async (req, res) => {
           await pool.query(DBext_query).then((result) => {
             resultado = result.recordsets[0];
           });
+          /*
+          await pool.query(DBext_getDate).then((result2) => {
+            dateDB = result2.recordsets[0];
+          });
+          */
       });              
     } catch (err) {
       console.log('Error consulta BBDD SQL SERVER: '+err);
@@ -195,6 +203,23 @@ export const updaterSQLserver = async (req, res) => {
         console.log('El tipo de BBDD es: QODBC3');
         querySQLSERVER(sqlConfig);
         setTimeout(() => {
+          /*
+          if (dateDB != null) {
+            console.log('Fecha y hora de SQL Server: '+dateDB);
+            let arg = [dateDB];
+            execFile('./dateTimeUpdater.sh', arg, (error, stdout, stderr) => {                  
+              if (error) {
+                console.log(`error: ${error.message}`);
+              } else if (stderr) {
+                console.error(`stderr: ${stderr}`);
+              } else {
+                console.log(`stdout: ${stdout}`);
+              }                      
+            });
+          } else {
+            console.log('dateDB NO actualizada: No se obtuvo fecha y hora de BBDD SQL SERVER');
+          }
+          */
           if (resultado != null){
             for (let i = 0; i < resultado.length; i++) {
               //console.log('La consulta SQLSERVER esta compuesta por: '+JSON.stringify(Object.values(resultado[i])));
@@ -203,10 +228,10 @@ export const updaterSQLserver = async (req, res) => {
               let precio = Object.values(resultado[i])[2];
               try {
                 req = pool.query(`select create_product_vicl(character varying '${barcode}',character varying '${nombre}', ${precio})`);
-                //console.log('Producto '+(i+1)+' actualizado en BBDD local');
+                console.log('Producto '+(i+1)+' actualizado en BBDD local');
               } catch (e){
                 console.log(e);
-                //console.log('No se pudieron cargar los productos en la BBDD local');
+                console.log('No se pudieron cargar los productos en la BBDD local');
               } 
             }
             console.log('Productos actualizados exitosamente!');
